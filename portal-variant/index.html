@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLISS — Портал · Throne and Liberty</title>
+<link rel="icon" type="image/png" href="assets/avatar.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --night:   #0b0e2a;
+    --abyss:   #070918;
+    --violet:  #7b5cd6;
+    --magenta: #c88bd8;
+    --gold:    #e6c37a;
+    --gold-hi: #f7e3b0;
+    --peach:   #f2c9a4;
+    --emerald: #55a680;
+    --star:    #dfe6ff;
+    --line:    rgba(230,195,122,.25);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background:
+      radial-gradient(ellipse 120% 60% at 50% -10%, #1a1f4d 0%, transparent 60%),
+      radial-gradient(ellipse 90% 50% at 85% 110%, rgba(242,201,164,.05) 0%, transparent 60%),
+      linear-gradient(180deg, var(--abyss) 0%, var(--night) 45%, #100f30 75%, #191238 100%);
+    background-attachment:fixed;
+    color:var(--star); font-family:'Cormorant Garamond', serif;
+    overflow-x:hidden;
+  }
+  ::selection { background:var(--violet); color:#fff; }
+
+  /* ---------- фоновые слои ---------- */
+  #stars { position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .vignette { position:fixed; inset:0; z-index:2; pointer-events:none;
+    background:radial-gradient(ellipse 95% 75% at 50% 45%, transparent 55%, rgba(4,5,14,.78) 100%); }
+  main { position:relative; z-index:5; }
+
+  /* ---------- прелоадер ---------- */
+  #loader { position:fixed; inset:0; z-index:2000; background:var(--abyss);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:30px;
+    transition:opacity 1s ease, visibility 1s; }
+  #loader.done { opacity:0; visibility:hidden; }
+  #loader .ring-wrap { position:relative; width:110px; height:110px; }
+  #loader .r1, #loader .r2 { position:absolute; inset:0; border-radius:50%; border:1px solid transparent; }
+  #loader .r1 { border-top-color:var(--gold); border-right-color:rgba(230,195,122,.3); animation:spin 1.6s linear infinite; }
+  #loader .r2 { inset:14px; border-bottom-color:var(--violet); border-left-color:rgba(123,92,214,.35); animation:spin 2.2s linear reverse infinite; }
+  #loader .core { position:absolute; inset:38px; border-radius:50%;
+    background:radial-gradient(circle, #f7e3b0 0%, #c88bd8 45%, transparent 75%);
+    animation:corePulse 1.8s ease-in-out infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes corePulse { 0%,100%{opacity:.55; scale:.85} 50%{opacity:1; scale:1.1} }
+  #loader .lt { font-family:'Cinzel'; font-weight:600; letter-spacing:.5em; font-size:12px; color:var(--gold); text-transform:uppercase; }
+
+  /* ---------- навигация ---------- */
+  nav { position:fixed; top:0; left:0; right:0; z-index:100;
+    display:flex; justify-content:space-between; align-items:center; padding:22px 44px;
+    background:linear-gradient(rgba(7,9,24,.88), transparent); backdrop-filter:blur(3px); }
+  nav .brand { display:flex; align-items:center; gap:14px; text-decoration:none; }
+  nav .brand img { width:38px; height:38px; border-radius:50%; object-fit:cover;
+    border:1px solid var(--gold); box-shadow:0 0 18px rgba(230,195,122,.35), 0 0 0 3px rgba(230,195,122,.12); }
+  nav .brand span { font-family:'Cinzel'; font-weight:700; letter-spacing:.42em; font-size:14px; color:var(--gold-hi); }
+  nav .links { display:flex; gap:34px; }
+  nav .links a { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.3em; color:var(--star);
+    text-decoration:none; text-transform:uppercase; opacity:.6; transition:.3s; position:relative; }
+  nav .links a::after { content:'✦'; position:absolute; left:50%; bottom:-16px; transform:translateX(-50%) scale(0);
+    font-size:8px; color:var(--gold); transition:transform .35s; }
+  nav .links a:hover { opacity:1; color:var(--gold-hi); }
+  nav .links a:hover::after { transform:translateX(-50%) scale(1); }
+  @media (max-width:820px){ nav { padding:16px 20px; } nav .links { display:none; } }
+
+  /* ---------- боковая линия ---------- */
+  .rail { position:fixed; right:36px; top:50%; transform:translateY(-50%); z-index:100;
+    display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .rail span { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.35em; color:rgba(223,230,255,.28);
+    writing-mode:vertical-rl; }
+  .rail .rune { color:var(--magenta); font-size:13px; }
+  .rail .rline { width:1px; height:80px; background:linear-gradient(var(--line), transparent); }
+  @media (max-width:1100px){ .rail { display:none; } }
+
+  /* ---------- типографика ---------- */
+  .eyebrow { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.55em; color:var(--gold);
+    text-transform:uppercase; display:flex; align-items:center; gap:16px; }
+  .eyebrow::before { content:'✦'; font-size:9px; }
+  h2.big { font-family:'Cinzel'; font-weight:700; font-size:clamp(28px,4.4vw,54px); line-height:1.18; color:#f2efdf; }
+  h2.big em { font-family:'Cormorant Garamond'; font-style:italic; font-weight:500; color:var(--gold); }
+  .lead { font-size:19px; line-height:1.78; color:rgba(223,230,255,.66); margin-top:26px; max-width:480px; }
+
+  .chapter { min-height:100vh; display:flex; align-items:center; padding:14vh 8vw; position:relative; scroll-margin-top:60px; }
+  @media (max-width:760px){ .chapter { padding:12vh 6vw; } }
+  .reveal { opacity:0; transform:translateY(46px); transition:opacity 1s cubic-bezier(.2,.7,.2,1), transform 1s cubic-bezier(.2,.7,.2,1); }
+  .reveal.on { opacity:1; transform:translateY(0); }
+  .d1 { transition-delay:.12s; } .d2 { transition-delay:.24s; } .d3 { transition-delay:.36s; }
+
+  /* ---------- ГЕРОЙ: арка + портал ---------- */
+  #hero { flex-direction:column; justify-content:center; text-align:center; padding-bottom:10vh; }
+  .stage-glow { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%);
+    width:min(560px,74vw); height:min(560px,74vw); pointer-events:none; z-index:0; opacity:.85;
+    background:radial-gradient(circle, rgba(123,92,214,.2) 0%, rgba(200,139,216,.07) 40%, transparent 70%);
+    filter:blur(10px); }
+  .portal-stage { position:relative; width:min(430px,72vw); aspect-ratio:600/780; margin:0 auto clamp(10px,2.5vh,26px); z-index:1; }
+  .portal-stage canvas { position:absolute; inset:0; width:100%; height:100%; }
+  .portal-stage svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
+    filter:drop-shadow(0 22px 44px rgba(5,6,18,.85)); }
+  .portal-stage .hint { position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+    font-family:'JetBrains Mono'; font-size:8.5px; letter-spacing:.4em; color:rgba(247,227,176,.4); white-space:nowrap; }
+  .orbit-text { position:absolute; inset:0; z-index:2; pointer-events:none; }
+  .orbit-text svg { position:absolute; top:50%; left:50%; width:136%; height:136%;
+    overflow:visible; animation:orbitSpin 46s linear infinite; }
+  @keyframes orbitSpin {
+    from { transform:translate(-50%,-50%) rotate(0deg); }
+    to   { transform:translate(-50%,-50%) rotate(360deg); }
+  }
+  .orbit-text text { font-family:'JetBrains Mono'; font-size:11px; letter-spacing:.42em; fill:rgba(230,195,122,.55); text-transform:uppercase; }
+
+  #hero .h-title { font-family:'Cinzel'; font-weight:900; font-size:clamp(64px,13vw,180px); line-height:.95;
+    letter-spacing:.14em; margin-top:14px; position:relative; z-index:3;
+    background:linear-gradient(180deg, #fdf6e3 15%, var(--gold) 55%, #8a6c34 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 34px rgba(230,195,122,.3)); }
+  #hero .h-title .L { display:inline-block; opacity:0; transform:translateY(30px) rotateX(40deg); }
+  #hero .h-title.typed .L { animation:letterIn .9s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes letterIn { to { opacity:1; transform:translateY(0) rotateX(0); } }
+  #hero .h-sub { font-family:'Cormorant Garamond'; font-style:italic; font-size:clamp(19px,2.8vw,30px);
+    color:rgba(223,230,255,.8); margin-top:18px; }
+  #hero .h-tag { margin-top:20px; font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.5em;
+    color:rgba(200,139,216,.8); }
+  #hero .h-meta { position:absolute; bottom:40px; left:0; right:0; display:flex; justify-content:center;
+    gap:52px; row-gap:12px; flex-wrap:wrap; padding:0 20px; }
+  #hero .h-meta div { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.25em; color:rgba(223,230,255,.4); }
+  #hero .h-meta b { color:var(--gold); font-weight:400; }
+
+  /* ---------- рунический разделитель ---------- */
+  .runes { overflow:hidden; padding:16px 0; border-top:1px solid rgba(200,139,216,.18); border-bottom:1px solid rgba(200,139,216,.18); }
+  .runes .inner { display:flex; gap:56px; width:max-content; animation:marq 36s linear infinite; }
+  .runes span { font-size:15px; letter-spacing:.3em; color:rgba(200,139,216,.5); white-space:nowrap; }
+  .runes span i { font-style:normal; color:rgba(230,195,122,.4); margin:0 22px; }
+  @keyframes marq { to { transform:translateX(-50%); } }
+
+  /* ---------- стелы кредо ---------- */
+  .steles { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; margin-top:60px; perspective:1100px; }
+  @media (max-width:920px){ .steles { grid-template-columns:1fr; } }
+  .stele { position:relative; padding:52px 32px 40px; text-align:center;
+    background:linear-gradient(175deg, rgba(26,31,77,.55), rgba(10,12,34,.72) 65%);
+    border:1px solid rgba(85,109,180,.25); backdrop-filter:blur(10px);
+    transition:transform .5s cubic-bezier(.2,.7,.2,1), border-color .5s, box-shadow .5s; }
+  .stele::before, .stele::after { content:''; position:absolute; width:22px; height:22px; transition:.5s; }
+  .stele::before { top:10px; left:10px; border-top:1px solid var(--gold); border-left:1px solid var(--gold); }
+  .stele::after { bottom:10px; right:10px; border-bottom:1px solid var(--gold); border-right:1px solid var(--gold); }
+  .stele:hover { transform:translateY(-10px); border-color:rgba(230,195,122,.55);
+    box-shadow:0 34px 90px -30px rgba(123,92,214,.5); }
+  .stele:hover::before, .stele:hover::after { width:34px; height:34px; }
+  .stele .sig { font-family:'Cinzel'; font-weight:600; font-size:15px; letter-spacing:.3em; color:var(--magenta); }
+  .stele h3 { font-family:'Cinzel'; font-weight:700; font-size:17px; color:#f4efe0; margin:20px 0 16px; letter-spacing:.08em; }
+  .stele p { font-size:17.5px; line-height:1.68; color:rgba(223,230,255,.68); }
+  .stele .orn { margin:22px auto 0; width:60px; height:1px;
+    background:linear-gradient(90deg, transparent, var(--gold), transparent); position:relative; }
+  .stele .orn::after { content:'✦'; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+    font-size:9px; color:var(--gold); }
+
+  /* ---------- созвездие хроники ---------- */
+  .split { display:grid; grid-template-columns:1.05fr .95fr; gap:70px; align-items:center; }
+  @media (max-width:980px){ .split { grid-template-columns:1fr; gap:48px; } }
+  .stats { display:flex; gap:44px; margin-top:44px; flex-wrap:wrap; }
+  .stat b { font-family:'Cinzel'; font-weight:600; font-size:40px; color:var(--gold-hi); display:block; }
+  .stat span { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:rgba(223,230,255,.45); text-transform:uppercase; }
+  .constellation { position:relative; padding-left:46px; }
+  .constellation::before { content:''; position:absolute; left:14px; top:8px; bottom:8px; width:1px;
+    background:linear-gradient(180deg, transparent, rgba(230,195,122,.5) 15%, rgba(123,92,214,.5) 85%, transparent); }
+  .cnode { position:relative; padding:13px 0; opacity:0; transform:translateX(-24px);
+    transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  .cnode.on { opacity:1; transform:translateX(0); }
+  .cnode::before { content:'✦'; position:absolute; left:-38px; top:12px; font-size:13px; color:var(--gold);
+    text-shadow:0 0 12px rgba(230,195,122,.9); }
+  .cnode.major::before { content:'✧'; font-size:17px; color:var(--magenta); text-shadow:0 0 14px rgba(200,139,216,.9); }
+  .cnode .ct { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.25em; color:var(--magenta); }
+  .cnode .cm { font-size:17.5px; color:rgba(223,230,255,.78); margin-top:4px; font-style:italic; }
+
+  /* ---------- баннер-витрина ---------- */
+  .banner-sec { padding:6vh 8vw 0; }
+  .banner-frame { position:relative; border:1px solid var(--line); padding:12px;
+    background:linear-gradient(160deg, rgba(26,31,77,.4), rgba(10,12,34,.6)); }
+  .banner-frame::before, .banner-frame::after { content:''; position:absolute; width:26px; height:26px; }
+  .banner-frame::before { top:-1px; left:-1px; border-top:2px solid var(--gold); border-left:2px solid var(--gold); }
+  .banner-frame::after { bottom:-1px; right:-1px; border-bottom:2px solid var(--gold); border-right:2px solid var(--gold); }
+  .banner-frame img { display:block; width:100%; height:auto; }
+  .banner-cap { display:flex; justify-content:space-between; margin-top:14px; flex-wrap:wrap; gap:10px;
+    font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:rgba(223,230,255,.38); text-transform:uppercase; }
+  .banner-cap b { color:var(--gold); font-weight:400; }
+
+  /* ---------- библиотека ---------- */
+  .lib { display:grid; grid-template-columns:repeat(12,1fr); gap:22px; margin-top:56px; }
+  .vcard { position:relative; border:1px solid rgba(85,109,180,.28); overflow:hidden; background:#0a0c22;
+    transition:transform .45s cubic-bezier(.2,.7,.2,1), border-color .45s, box-shadow .45s; }
+  .vcard:hover { transform:translateY(-8px); border-color:rgba(230,195,122,.6);
+    box-shadow:0 26px 70px -24px rgba(123,92,214,.55); }
+  .vcard img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0;
+    filter:saturate(.55) brightness(.72) hue-rotate(-12deg); transition:filter .6s, transform .8s; opacity:.9; }
+  .vcard:hover img { filter:saturate(1.05) brightness(.95) hue-rotate(0deg); transform:scale(1.06); }
+  .vcard .cap { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end;
+    padding:24px; background:linear-gradient(transparent 42%, rgba(7,9,24,.94)); z-index:2; }
+  .vcard .cap .vt { font-family:'Cinzel'; font-weight:600; font-size:14px; color:#f4efe0; letter-spacing:.05em; }
+  .vcard .cap .vm { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.25em; color:var(--magenta); margin-top:8px;
+    opacity:0; transform:translateY(8px); transition:.4s; }
+  .vcard:hover .cap .vm { opacity:1; transform:translateY(0); }
+  .vcard .play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3;
+    width:64px; height:64px; border-radius:50%; border:1px solid rgba(247,227,176,.6);
+    display:flex; align-items:center; justify-content:center; opacity:0; scale:.7; transition:.45s;
+    background:rgba(7,9,24,.55); backdrop-filter:blur(6px); box-shadow:0 0 30px rgba(200,139,216,.4); }
+  .vcard:hover .play { opacity:1; scale:1; }
+  .v-featured { grid-column:span 7; aspect-ratio:16/9.4; }
+  .v-a { grid-column:span 5; aspect-ratio:16/9.4; }
+  .v-b, .v-c, .v-d { grid-column:span 4; aspect-ratio:1/1.06; }
+  @media (max-width:900px){ .lib { grid-template-columns:1fr; } .lib > * { grid-column:span 1 !important; aspect-ratio:16/10; } }
+  .v-featured .play { width:88px; height:88px; }
+
+  /* ---------- видео-проигрыватель и карточки-ссылки ---------- */
+  .vplayer { position:relative; background:#0a0c22; }
+  .vplayer video { width:100%; height:100%; object-fit:cover; display:block; background:#05061a; }
+  .vplayer .vlabel { position:absolute; top:0; left:0; right:0; z-index:3; pointer-events:none;
+    padding:20px 24px 30px; background:linear-gradient(rgba(7,9,24,.82), transparent); }
+  .vplayer .vlabel .vt { font-family:'Cinzel'; font-weight:600; font-size:14px; color:#f4efe0; letter-spacing:.05em; }
+  .vplayer .vlabel .vm { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.25em; color:var(--magenta); margin-top:6px; }
+  .vplayer .vfall { position:absolute; inset:0; z-index:4; display:none; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px; text-align:center; padding:24px;
+    background:linear-gradient(165deg, #14173a, #0a0c22); }
+  .vplayer .vfall.show { display:flex; }
+  .vplayer .vfall .fi { font-size:30px; color:var(--gold); text-shadow:0 0 18px rgba(230,195,122,.6); }
+  .vplayer .vfall .ft { font-family:'Cormorant Garamond'; font-style:italic; font-size:17.5px;
+    color:rgba(223,230,255,.78); max-width:360px; line-height:1.6; }
+  .vplayer .vfall a { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.3em; color:var(--gold-hi);
+    text-decoration:none; border:1px solid var(--line); padding:12px 24px; transition:.3s; }
+  .vplayer .vfall a:hover { background:rgba(230,195,122,.12); box-shadow:0 0 24px rgba(230,195,122,.2); }
+
+  .linkcard { display:flex; flex-direction:column; justify-content:center; align-items:center;
+    text-align:center; gap:12px; padding:30px 26px; text-decoration:none;
+    background:linear-gradient(168deg, rgba(26,31,77,.5), rgba(10,12,34,.72)); }
+  .linkcard .lg { font-size:26px; color:var(--magenta); line-height:1; }
+  .linkcard .lt { font-family:'Cinzel'; font-weight:700; font-size:15px; color:#f4efe0; letter-spacing:.06em; }
+  .linkcard .ls { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.22em; color:rgba(223,230,255,.5); }
+  .linkcard .la { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:var(--gold);
+    margin-top:6px; opacity:0; transform:translateY(6px); transition:.4s; }
+  .linkcard:hover .la { opacity:1; transform:translateY(0); }
+  @media (max-width:760px){ .linkcard { aspect-ratio:auto; padding:34px 22px; } }
+
+  /* ---------- привилегии ---------- */
+  .perks { margin-top:60px; }
+  .perk { display:grid; grid-template-columns:90px 1fr 1.1fr; gap:30px; align-items:baseline;
+    padding:34px 10px; border-bottom:1px solid rgba(123,92,214,.22); transition:.4s; position:relative; }
+  .perk:first-child { border-top:1px solid rgba(123,92,214,.22); }
+  .perk::before { content:''; position:absolute; left:0; bottom:-1px; height:1px; width:0;
+    background:linear-gradient(90deg, var(--violet), var(--gold)); transition:width .6s cubic-bezier(.2,.7,.2,1); }
+  .perk:hover::before { width:100%; }
+  .perk:hover { padding-left:26px; }
+  .perk .pn { font-family:'JetBrains Mono'; font-size:11px; color:var(--magenta); letter-spacing:.2em; }
+  .perk .pt { font-family:'Cinzel'; font-weight:700; font-size:clamp(15px,2vw,22px); color:#f2efdf; letter-spacing:.04em; }
+  .perk .pd { font-size:17px; line-height:1.65; color:rgba(223,230,255,.62); }
+  @media (max-width:860px){ .perk { grid-template-columns:1fr; gap:10px; } }
+
+  /* ---------- финал ---------- */
+  #join { text-align:center; flex-direction:column; justify-content:center; min-height:100vh; padding-bottom:14vh; }
+  .emblem { position:relative; width:150px; height:150px; margin:0 auto 34px; }
+  .emblem img { position:absolute; inset:14px; width:calc(100% - 28px); height:calc(100% - 28px);
+    border-radius:50%; object-fit:cover; border:1px solid var(--gold);
+    box-shadow:0 0 44px rgba(123,92,214,.55), 0 0 24px rgba(230,195,122,.3); }
+  .emblem::before, .emblem::after { content:''; position:absolute; border-radius:50%; }
+  .emblem::before { inset:6px; border:1px solid rgba(230,195,122,.65); animation:spin 30s linear infinite;
+    border-style:dashed; }
+  .emblem::after { inset:0; border:1px solid rgba(230,195,122,.35);
+    box-shadow:inset 0 0 24px rgba(123,92,214,.25); }
+  #join .h-title2 { font-family:'Cinzel'; font-weight:800; font-size:clamp(38px,8vw,110px); line-height:1.08; color:#f2efdf; }
+  #join .h-title2 em { font-family:'Cormorant Garamond'; font-weight:500; font-style:italic; color:var(--gold); }
+  .btn-portal { display:inline-flex; align-items:center; gap:18px; margin-top:54px;
+    padding:24px 58px; border:1px solid var(--gold); color:var(--gold-hi); text-decoration:none;
+    font-family:'Cinzel'; font-weight:600; font-size:13px; letter-spacing:.32em;
+    position:relative; overflow:hidden; transition:color .45s, box-shadow .45s; background:transparent; }
+  .btn-portal::before { content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, var(--violet), #9a6be0); transform:scaleX(0); transform-origin:right;
+    transition:transform .5s cubic-bezier(.76,0,.24,1); z-index:-1; }
+  .btn-portal:hover { color:#fff; box-shadow:0 0 44px rgba(123,92,214,.5); }
+  .btn-portal:hover::before { transform:scaleX(1); transform-origin:left; }
+
+  footer { position:relative; z-index:5; padding:36px 44px 46px; display:flex; justify-content:space-between;
+    align-items:center; flex-wrap:wrap; gap:20px; border-top:1px solid rgba(123,92,214,.2);
+    background:linear-gradient(transparent, rgba(7,9,24,.8)); backdrop-filter:blur(4px); }
+  footer .fbrand { display:flex; align-items:center; gap:12px; }
+  footer .fbrand img { width:30px; height:30px; border-radius:50%; object-fit:cover; border:1px solid var(--line); }
+  footer a, footer span { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em;
+    color:rgba(223,230,255,.42); text-decoration:none; text-transform:uppercase; }
+  footer a:hover { color:var(--gold-hi); }
+  @media (max-width:760px){ footer { padding:28px 20px 36px; } }
+
+  @media (prefers-reduced-motion: reduce){
+    .runes .inner, .orbit-text svg, .emblem::before { animation:none; }
+    .reveal, .cnode { transition:none; opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="ring-wrap"><div class="r1"></div><div class="r2"></div><div class="core"></div></div>
+  <div class="lt">Открываем портал</div>
+</div>
+
+<canvas id="stars"></canvas>
+<div class="vignette"></div>
+
+<nav>
+  <a href="#hero" class="brand"><img src="assets/avatar.png" alt="BLISS"><span>BLISS</span></a>
+  <div class="links">
+    <a href="#credo">Кредо</a>
+    <a href="#chronicle">Хроника</a>
+    <a href="#library">Библиотека</a>
+    <a href="#join">Вступить</a>
+  </div>
+</nav>
+
+<div class="rail">
+  <span class="rune">ᚱ</span>
+  <span>AD · PORTAM · AETERNAM</span>
+  <div class="rline"></div>
+  <span style="color:var(--gold)">MMXXVI</span>
+</div>
+
+<main>
+
+  <!-- ================= ГЕРОЙ ================= -->
+  <section id="hero" class="chapter">
+    <div class="stage-glow"></div>
+    <div class="eyebrow" style="justify-content:center; margin-bottom:28px">THRONE AND LIBERTY · PVE GUILD</div>
+
+    <div class="portal-stage" id="stage">
+      <canvas id="portal"></canvas>
+
+      <!-- орбитальная надпись вокруг портала -->
+      <div class="orbit-text">
+        <svg width="560" height="560" viewBox="0 0 560 560">
+          <defs><path id="oc" d="M280,70 a210,210 0 1,1 -0.1,0"/></defs>
+          <text><textPath href="#oc">ИССЛЕДУЙ ✦ ФАРМИ ✦ ПОНИМАЙ ✦ ИССЛЕДУЙ ✦ ФАРМИ ✦ ПОНИМАЙ ✦</textPath></text>
+        </svg>
+      </div>
+
+      <!-- каменная арка -->
+      <svg viewBox="0 0 600 780" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="stoneG" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#3c4266"/><stop offset=".5" stop-color="#2a2f4e"/><stop offset="1" stop-color="#181c34"/>
+          </linearGradient>
+          <linearGradient id="stoneG2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#434a72"/><stop offset="1" stop-color="#20243f"/>
+          </linearGradient>
+          <radialGradient id="gemG" cx=".5" cy=".42" r=".65">
+            <stop offset="0" stop-color="#f2c9f7"/><stop offset=".45" stop-color="#b07ce0"/><stop offset="1" stop-color="#5b3a8c"/>
+          </radialGradient>
+          <linearGradient id="vineG" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#2e6e52"/><stop offset="1" stop-color="#6cc396"/>
+          </linearGradient>
+        </defs>
+
+        <!-- свечение из проёма -->
+        <ellipse cx="300" cy="430" rx="170" ry="200" fill="url(#gemG)" opacity=".12" style="filter:blur(28px)"/>
+
+        <!-- колонны -->
+        <g>
+          <rect x="88"  y="184" width="60" height="556" fill="url(#stoneG)"/>
+          <rect x="452" y="184" width="60" height="556" fill="url(#stoneG)"/>
+          <!-- каннелюры -->
+          <g stroke="#141728" stroke-width="2" opacity=".55">
+            <line x1="102" y1="196" x2="102" y2="728"/><line x1="116" y1="196" x2="116" y2="728"/>
+            <line x1="130" y1="196" x2="130" y2="728"/><line x1="144" y1="196" x2="144" y2="728"/>
+            <line x1="466" y1="196" x2="466" y2="728"/><line x1="480" y1="196" x2="480" y2="728"/>
+            <line x1="494" y1="196" x2="494" y2="728"/><line x1="508" y1="196" x2="508" y2="728"/>
+          </g>
+          <!-- капители и базы -->
+          <rect x="78"  y="168" width="80" height="18" fill="url(#stoneG2)"/>
+          <rect x="442" y="168" width="80" height="18" fill="url(#stoneG2)"/>
+          <rect x="76"  y="738" width="84" height="14" fill="url(#stoneG2)"/>
+          <rect x="66"  y="752" width="104" height="16" fill="#232741"/>
+          <rect x="440" y="738" width="84" height="14" fill="url(#stoneG2)"/>
+          <rect x="430" y="752" width="104" height="16" fill="#232741"/>
+          <!-- блики -->
+          <line x1="90" y1="190" x2="90" y2="730" stroke="#5c6494" stroke-width="2" opacity=".5"/>
+          <line x1="454" y1="190" x2="454" y2="730" stroke="#5c6494" stroke-width="2" opacity=".5"/>
+        </g>
+
+        <!-- арка -->
+        <path d="M148,186 C148,64 452,64 452,186" stroke="url(#stoneG2)" stroke-width="36" stroke-linecap="butt"/>
+        <path d="M148,186 C148,64 452,64 452,186" stroke="#4a5178" stroke-width="2" opacity=".7"/>
+        <path d="M126,186 C126,40 474,40 474,186" stroke="rgba(230,195,122,.4)" stroke-width="1.2"/>
+        <path d="M170,186 C170,88 430,88 430,186" stroke="#141728" stroke-width="2" opacity=".6"/>
+
+        <!-- замковый камень с самоцветом -->
+        <g>
+          <polygon points="300,26 330,86 300,146 270,86" fill="url(#stoneG2)" stroke="#4a5178" stroke-width="1.5"/>
+          <polygon points="300,40 320,86 300,132 280,86" fill="url(#gemG)" opacity=".95"/>
+          <circle cx="300" cy="86" r="12" fill="url(#gemG)"/>
+          <circle cx="296" cy="81" r="4" fill="#fdf0ff" opacity=".9"/>
+          <animate attributeName="opacity" values="1;.75;1" dur="3s" repeatCount="indefinite"/>
+        </g>
+
+        <!-- руны на арке -->
+        <g fill="#c88bd8" font-size="17" font-family="serif" opacity=".85" text-anchor="middle">
+          <text x="185" y="98" transform="rotate(-38 185 98)">ᚱ</text>
+          <text x="242" y="68" transform="rotate(-20 242 68)">ᛗ</text>
+          <text x="358" y="68" transform="rotate(20 358 68)">ᛟ</text>
+          <text x="415" y="98" transform="rotate(38 415 98)">ᚨ</text>
+        </g>
+
+        <!-- лианы -->
+        <g stroke="url(#vineG)" stroke-width="3.5" fill="none" stroke-linecap="round">
+          <path d="M96,730 C112,660 84,610 104,540 C120,486 92,430 106,372 C118,322 96,270 106,224"/>
+          <path d="M504,730 C488,660 516,610 496,540 C480,486 508,430 494,372 C482,322 504,270 494,224"/>
+          <path d="M132,712 C120,668 142,634 130,588"/>
+        </g>
+        <g fill="url(#vineG)">
+          <ellipse cx="104" cy="540" rx="9" ry="5" transform="rotate(-24 104 540)"/>
+          <ellipse cx="106" cy="372" rx="9" ry="5" transform="rotate(20 106 372)"/>
+          <ellipse cx="106" cy="224" rx="8" ry="4.5" transform="rotate(-18 106 224)"/>
+          <ellipse cx="496" cy="540" rx="9" ry="5" transform="rotate(24 496 540)"/>
+          <ellipse cx="494" cy="372" rx="9" ry="5" transform="rotate(-20 494 372)"/>
+          <ellipse cx="494" cy="224" rx="8" ry="4.5" transform="rotate(18 494 224)"/>
+          <ellipse cx="130" cy="588" rx="8" ry="4.5" transform="rotate(-30 130 588)"/>
+        </g>
+        <!-- мох -->
+        <g fill="#3f8f6d" opacity=".35">
+          <ellipse cx="100" cy="180" rx="26" ry="9"/><ellipse cx="510" cy="182" rx="24" ry="8"/>
+          <ellipse cx="120" cy="742" rx="30" ry="10"/><ellipse cx="490" cy="742" rx="28" ry="9"/>
+        </g>
+
+        <!-- ступени -->
+        <rect x="140" y="756" width="320" height="8" fill="#2a2f4e" opacity=".8"/>
+        <rect x="170" y="748" width="260" height="8" fill="#33395c" opacity=".8"/>
+      </svg>
+
+      <div class="hint">⟲ ПОТЯНИ ВИХРЬ — ОН ОТКЛИКНЕТСЯ</div>
+    </div>
+
+    <h1 class="h-title" id="heroTitle">BLISS</h1>
+    <p class="h-sub">Гильдия у портала: спокойствие внутри, шторм снаружи.</p>
+    <p class="h-tag">THRONE AND LIBERTY · ОРДЕН СПУТНИКОВ ПОРТАЛА</p>
+
+    <div class="h-meta">
+      <div>ИГРОКОВ — <b>120+</b></div>
+      <div>РЕЙДОВ / НЕДЕЛЮ — <b>3</b></div>
+      <div>ТОКСИЧНОСТИ — <b>0.00%</b></div>
+      <div>БАЗА ЗНАНИЙ — <b>TL-BUILD.RU</b></div>
+    </div>
+  </section>
+
+  <!-- ================= руны ================= -->
+  <div class="runes"><div class="inner" id="runes-inner"></div></div>
+
+  <!-- ================= КРЕДО ================= -->
+  <section id="credo" class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="reveal">
+      <div class="eyebrow">Глава I — Кредо стражей</div>
+      <h2 class="big" style="margin-top:30px">Мы верим, что игра —<br>это <em>искусство неспешности.</em></h2>
+      <p class="lead">Bliss — PvE-гильдия для тех, кто устал от криков в войсе и дедлайнов в календаре. Мы закрываем контент уверенно, но без надрыва — и разбираем каждую механику до последней шестерёнки.</p>
+    </div>
+    <div class="steles">
+      <div class="stele reveal d1">
+        <div class="sig">SIGILLUM · I</div>
+        <h3>РЕЙДЫ БЕЗ ТОКСИЧНОСТИ</h3>
+        <p>Вайп — не повод для крика, а повод для разбора. Рейд-лидеры объясняют механики дважды, а бьют по столу — никогда. Атмосфера ближе к ужину с друзьями, чем к спортивной раздевалке.</p>
+        <div class="orn"></div>
+      </div>
+      <div class="stele reveal d2">
+        <div class="sig">SIGILLUM · II</div>
+        <h3>ГАЙДЫ И МЕХАНИКИ</h3>
+        <p>Каждую неделю — разборы билдов, боссов и экономики. Мы объясняем не только «что качать», но и «почему это работает», чтобы каждый видел свою роль на три хода вперёд.</p>
+        <div class="orn"></div>
+      </div>
+      <div class="stele reveal d3">
+        <div class="sig">SIGILLUM · III</div>
+        <h3>ЛЮДИ ПРЕЖДЕ ВСЕГО</h3>
+        <p>Лояльный онлайн: жизнь важнее игры. За новичком закрепляется куратор. PvP — только по желанию. Мы строим гильдию, в которую хочется возвращаться, а не отчитываться.</p>
+        <div class="orn"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ХРОНИКА ================= -->
+  <section id="chronicle" class="chapter">
+    <div class="split">
+      <div class="reveal">
+        <div class="eyebrow">Глава II — Созвездие деяний</div>
+        <h2 class="big" style="margin-top:30px">Каждый рейд —<br><em>новая звезда.</em></h2>
+        <p class="lead">Мы ведём открытую летопись: киллы, вайпы, разборы ошибок и забавные моменты. Честная хроника вместо глянцевых скриншотов — потому что учатся на ошибках, а не на победных парадах.</p>
+        <div class="stats">
+          <div class="stat"><b>247</b><span>рейдов записано</span></div>
+          <div class="stat"><b>38</b><span>мировых боссов</span></div>
+          <div class="stat"><b>96%</b><span>возвращаются</span></div>
+        </div>
+      </div>
+      <div class="constellation reveal d2" id="constellation">
+        <div class="cnode major"><div class="ct">21:04 · СБОР</div><div class="cm">собран рейд-состав «Аврора» — 10/10</div></div>
+        <div class="cnode"><div class="ct">21:07 · ВХОД</div><div class="cm">Пещеры Тирнаха · уровень угрозы: высокая</div></div>
+        <div class="cnode"><div class="ct">21:12 · ФАЗА I</div><div class="cm">пройдена без потерь — щиты держат</div></div>
+        <div class="cnode"><div class="ct">21:19 · ВАЙП</div><div class="cm">фаза II — разобраны позиции, без криков</div></div>
+        <div class="cnode major"><div class="ct">21:34 · КИЛЛ</div><div class="cm">повторная попытка — босс повержен ✦</div></div>
+        <div class="cnode"><div class="ct">21:36 · ТРОФЕИ</div><div class="cm">распределены по ротации — без спора</div></div>
+        <div class="cnode"><div class="ct">21:41 · АРХИВ</div><div class="cm">летопись обновлена, скриншоты в альбоме</div></div>
+        <div class="cnode"><div class="ct">21:45 · ГОЛОС</div><div class="cm">обсуждаем билд танка за чаем</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= БАННЕР ================= -->
+  <section class="banner-sec">
+    <div class="banner-frame reveal">
+      <img src="assets/cover.png" alt="Баннер сообщества BLISS" id="bannerImg">
+      <div class="banner-cap">
+        <span>BANNER · СОЦИАЛЬНЫЕ СЕТИ</span>
+        <span>BLISS ✦ <b>THRONE AND LIBERTY</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= БИБЛИОТЕКА ================= -->
+  <section id="library" class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="reveal">
+      <div class="eyebrow">Глава III — Библиотека портала</div>
+      <h2 class="big" style="margin-top:30px">Знание — <em>общее достояние.</em></h2>
+      <p class="lead">Видео-разборы гильдии и единая база билдов на tl-build.ru. Всё проверено основными составами на практике и актуализируется после каждого патча.</p>
+    </div>
+    <div class="lib">
+      <!-- видео-проигрыватель: локальный файл, работает без VPN -->
+      <div class="vcard v-featured vplayer reveal">
+        <video id="buildVideo" controls preload="metadata" playsinline poster="assets/cover.png">
+          <source src="assets/videos/dagger-bow-build.mp4" type="video/mp4">
+        </video>
+        <div class="vlabel">
+          <div class="vt">РАЗБОР БИЛДА · ДАГГЕР × БОУ</div>
+          <div class="vm">ВИДЕО ГИЛЬДИИ · ВОСПРОИЗВОДИТСЯ ЗДЕСЬ</div>
+        </div>
+        <div class="vfall" id="vfall">
+          <div class="fi">✦</div>
+          <div class="ft">Видео появится здесь совсем скоро — а пока посмотри разбор на YouTube</div>
+          <a href="https://www.youtube.com/watch?v=w9vhFuMIy8s" target="_blank" rel="noopener">ОТКРЫТЬ НА YOUTUBE</a>
+        </div>
+      </div>
+
+      <!-- билд недели: ссылка на конкретный билд -->
+      <a class="vcard v-a linkcard reveal d1" href="https://tl-build.ru/build/2688" target="_blank" rel="noopener">
+        <span class="lg">⚔</span>
+        <span class="lt">БИЛД НЕДЕЛИ</span>
+        <span class="ls">ДАГГЕР × БОУ · ПРОВЕРЕН В БОЮ</span>
+        <span class="la">ОТКРЫТЬ НА TL-BUILD.RU →</span>
+      </a>
+
+      <!-- сборник билдов -->
+      <a class="vcard v-b linkcard reveal d1" href="https://tl-build.ru/profile/lympen" target="_blank" rel="noopener">
+        <span class="lg">✦</span>
+        <span class="lt">СБОРНИК БИЛДОВ</span>
+        <span class="ls">ВСЕ СБОРКИ LYMPEN · ОБНОВЛЯЮТСЯ</span>
+        <span class="la">СМОТРЕТЬ ПРОФИЛЬ →</span>
+      </a>
+
+      <!-- полная версия на youtube -->
+      <a class="vcard v-c linkcard reveal d2" href="https://www.youtube.com/watch?v=w9vhFuMIy8s" target="_blank" rel="noopener">
+        <span class="lg">▷</span>
+        <span class="lt">ВИДЕО-РАЗБОР</span>
+        <span class="ls">ПОЛНАЯ ВЕРСИЯ · YOUTUBE</span>
+        <span class="la">СМОТРЕТЬ НА YOUTUBE →</span>
+      </a>
+
+      <!-- база знаний -->
+      <a class="vcard v-d linkcard reveal d3" href="https://tl-build.ru" target="_blank" rel="noopener">
+        <span class="lg">ᚒ</span>
+        <span class="lt">БАЗА ЗНАНИЙ</span>
+        <span class="ls">ГАЙДЫ И БИЛДЫ · TL-BUILD.RU</span>
+        <span class="la">ПЕРЕЙТИ НА САЙТ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ================= ПРИВИЛЕГИИ ================= -->
+  <section class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="reveal">
+      <div class="eyebrow">Глава IV — Дары портала</div>
+      <h2 class="big" style="margin-top:30px">Членство в ордене —<br><em>это преимущества.</em></h2>
+    </div>
+    <div class="perks reveal d1">
+      <div class="perk"><span class="pn">ᚱ 01</span><span class="pt">ПАРТНЁРКА T&L</span>
+        <span class="pd">Эксклюзивные плюшки партнёрской программы Throne and Liberty, розыгрыши призов и ранние разборы контент-апдейтов — ещё до их выхода.</span></div>
+      <div class="perk"><span class="pn">ᛗ 02</span><span class="pt">БАЗА TL-BUILD.RU</span>
+        <span class="pd">Единая база билдов и гайдов гильдии — открытая, актуальная и проверенная в бою. Знание не прячется в закрытых табличках.</span></div>
+      <div class="perk"><span class="pn">ᛟ 03</span><span class="pt">PvP ПО ЖЕЛАНИЮ</span>
+        <span class="pd">Никто не тащит на арену против твоей воли. PvP в Bliss — внутренние турниры и весёлые катки для тех, кому интересно.</span></div>
+      <div class="perk"><span class="pn">ᚨ 04</span><span class="pt">КУРАТОРСТВО</span>
+        <span class="pd">За каждым новичком закреплён наставник: прокачка, билд, первые данжи и объяснение механик без снисходительности.</span></div>
+      <div class="perk"><span class="pn">ᛞ 05</span><span class="pt">ГИЛЬДИЙСКАЯ КАЗНА</span>
+        <span class="pd">Общий банк, крафт и расходники для рейдов — на благо всех. Вступительный взнос: адекватность и чувство юмора.</span></div>
+    </div>
+  </section>
+
+  <!-- ================= ФИНАЛ ================= -->
+  <section id="join" class="chapter">
+    <div class="emblem reveal on"><img src="assets/avatar.png" alt="Эмблема BLISS"></div>
+    <div class="eyebrow reveal on" style="justify-content:center">Финал — Твой ход</div>
+    <h2 class="h-title2 reveal on d1" style="margin-top:30px">Шагни<br><em>сквозь портал.</em></h2>
+    <p class="lead reveal on d2" style="margin:32px auto 0; text-align:center">
+      Анкета занимает три минуты. Мы отвечаем в течение дня — и встречаем новичков так, как хотели бы, чтобы встречали нас.
+    </p>
+    <a href="https://discord.gg/mBpv9NNh" class="btn-portal reveal on d3">
+      ВСТУПИТЬ В DISCORD
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+    </a>
+  </section>
+
+  <footer>
+    <div class="fbrand"><img src="assets/avatar.png" alt=""><span>© MMXXVI · BLISS GUILD</span></div>
+    <div style="display:flex; gap:36px">
+      <a href="https://tl-build.ru">TL-BUILD.RU</a>
+      <a href="https://discord.gg/mBpv9NNh">DISCORD</a>
+      <span>THRONE AND LIBERTY</span>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+/* ============================================================
+   ПОРТАЛ — спиральный вихрь-галактика (WebGL, three.js)
+============================================================ */
+const pcanvas = document.getElementById('portal');
+const prenderer = new THREE.WebGLRenderer({ canvas: pcanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+prenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const pscene = new THREE.Scene();
+const pcam = new THREE.PerspectiveCamera(50, 600/780, 0.1, 10);
+pcam.position.z = 1;
+
+const uni = {
+  uTime:  { value: 0 },
+  uSpin:  { value: 0 },
+  uPulse: { value: 0 },
+  uRes:   { value: new THREE.Vector2(1, 1) }
+};
+const quad = new THREE.Mesh(
+  new THREE.PlaneGeometry(2, 2),
+  new THREE.ShaderMaterial({
+    uniforms: uni, transparent: true, depthWrite: false,
+    vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `
+      precision highp float;
+      uniform float uTime, uSpin, uPulse;
+      uniform vec2 uRes;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+      }
+      float fbm(vec2 p){
+        float v = 0.0, a = 0.5;
+        for(int i=0;i<5;i++){ v += a*noise(p); p = p*2.04 + vec2(19.7); a *= 0.52; }
+        return v;
+      }
+      void main(){
+        // координаты в долях реального канваса, центр проёма (0.5, 0.547)
+        vec2 uv = gl_FragCoord.xy / uRes;
+        vec2 c = vec2(0.5, 0.547);
+        vec2 p = uv - c; p.x *= uRes.x / uRes.y;
+        float r = length(p);
+        float R = 0.195;                       // радиус портала
+        float a = atan(p.y, p.x);
+
+        // спираль: закрутка угла от радиуса + время + пользовательский спин
+        float twist = a + uSpin + uTime * 0.11 + (R - r) * 9.0;
+        float arms  = sin(twist * 2.0) * 0.5 + 0.5;
+        float n     = fbm(vec2(twist * 1.35, r * 5.0 - uTime * 0.42));
+        float m     = clamp(n * 0.72 + arms * 0.34, 0.0, 1.0);
+
+        // палитра: индиго -> фиолет -> магента, золотое ядро
+        vec3 col = mix(vec3(0.016, 0.02, 0.075), vec3(0.36, 0.24, 0.72), pow(m, 1.4));
+        col += vec3(0.62, 0.36, 0.78) * pow(m, 4.2) * 1.15;
+        col += vec3(1.0, 0.85, 0.55) * exp(-r * (15.0 - uPulse * 5.0)) * (1.35 + uPulse);
+
+        // звёзды внутри воронки
+        vec2 sc = floor((p + c) * 90.0);
+        float st = step(0.994, hash(sc)) * (0.5 + 0.5 * sin(uTime * 3.0 + hash(sc) * 40.0));
+        col += vec3(0.85, 0.88, 1.0) * st * smoothstep(R, R*0.15, r) * 0.8;
+
+        // маска круга + золотое кольцо по краю
+        float mask = smoothstep(R, R - 0.006, r);
+        float ring = smoothstep(R + 0.008, R + 0.002, r) - smoothstep(R - 0.001, R - 0.007, r);
+        col += vec3(0.92, 0.76, 0.42) * ring * (0.9 + uPulse);
+
+        gl_FragColor = vec4(col, mask + ring * 0.9);
+      }`
+  })
+);
+quad.frustumCulled = false;
+pscene.add(quad);
+
+function psize() {
+  const r = pcanvas.parentElement.getBoundingClientRect();
+  prenderer.setSize(r.width, r.height, false);
+  prenderer.getDrawingBufferSize(uni.uRes.value);
+}
+psize();
+addEventListener('resize', psize);
+
+/* ---- интеракция портала: drag-закрутка с инерцией, клик-импульс ---- */
+let pdrag = false, ppx = 0, pvy = 0;
+const stage = document.getElementById('stage');
+stage.addEventListener('mousedown', e => { pdrag = true; ppx = e.clientX; });
+addEventListener('mouseup', () => pdrag = false);
+addEventListener('mousemove', e => {
+  if (pdrag) { pvy = (e.clientX - ppx) * 0.012; ppx = e.clientX; uni.uSpin.value += pvy; }
+});
+stage.addEventListener('click', () => { uni.uPulse.value = 1.6; });
+let scrollBoost = 0, lastSY = scrollY;
+addEventListener('scroll', () => {
+  scrollBoost += Math.min(0.06, Math.abs(scrollY - lastSY) * 0.0012);
+  lastSY = scrollY;
+}, { passive: true });
+
+/* ============================================================
+   ЗВЁЗДЫ + ПАРЯЩИЕ ИСКРЫ (2D canvas на весь экран)
+============================================================ */
+const sc = document.getElementById('stars'), sx = sc.getContext('2d');
+let SW, SH, stars = [], orbs = [];
+function sresize() {
+  SW = sc.width = innerWidth; SH = sc.height = innerHeight;
+  stars = Array.from({ length: Math.floor(SW * SH / 4200) }, () => ({
+    x: Math.random() * SW, y: Math.random() * SH, r: Math.random() * 1.1 + .2,
+    tw: Math.random() * Math.PI * 2, sp: .5 + Math.random() * 1.5
+  }));
+  orbs = Array.from({ length: 26 }, () => newOrb(true));
+}
+function newOrb(anywhere) {
+  const hues = ['230,195,122', '200,139,216', '242,201,164', '223,230,255'];
+  return {
+    x: Math.random() * SW, y: anywhere ? Math.random() * SH : SH + 20,
+    r: 1.2 + Math.random() * 2.6, vy: .18 + Math.random() * .4,
+    vx: (Math.random() - .5) * .16, ph: Math.random() * Math.PI * 2,
+    c: hues[Math.floor(Math.random() * hues.length)]
+  };
+}
+sresize(); addEventListener('resize', sresize);
+
+/* ============================================================
+   ГЛАВНЫЙ ЦИКЛ
+============================================================ */
+const pclock = new THREE.Clock();
+function loop() {
+  requestAnimationFrame(loop);
+  const t = pclock.getElapsedTime();
+
+  // затухание импульса и инерции
+  uni.uTime.value = t;
+  uni.uPulse.value *= 0.94;
+  if (!pdrag) { pvy *= 0.95; uni.uSpin.value += pvy; uni.uSpin.value += 0.0012 + scrollBoost; }
+  scrollBoost *= 0.9;
+
+  prenderer.render(pscene, pcam);
+
+  // звёзды и искры
+  sx.clearRect(0, 0, SW, SH);
+  for (const s of stars) {
+    const a = .25 + .75 * Math.abs(Math.sin(s.tw + t * s.sp * .3));
+    sx.globalAlpha = a * .8;
+    sx.fillStyle = '#dfe6ff';
+    sx.beginPath(); sx.arc(s.x, s.y, s.r, 0, 7); sx.fill();
+  }
+  for (const o of orbs) {
+    o.y -= o.vy; o.x += o.vx + Math.sin(t + o.ph) * .12;
+    if (o.y < -20) Object.assign(o, newOrb(false));
+    const a = .35 + .65 * Math.abs(Math.sin(t * 1.4 + o.ph));
+    const g = sx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 4);
+    g.addColorStop(0, 'rgba(' + o.c + ',' + (a * .9) + ')');
+    g.addColorStop(1, 'rgba(' + o.c + ',0)');
+    sx.globalAlpha = 1; sx.fillStyle = g;
+    sx.beginPath(); sx.arc(o.x, o.y, o.r * 4, 0, 7); sx.fill();
+  }
+  sx.globalAlpha = 1;
+}
+loop();
+
+/* ============================================================
+   UI: прелоадер, буквы, руны, созвездие, параллакс
+============================================================ */
+// буквы заголовка
+const ht = document.getElementById('heroTitle');
+ht.innerHTML = [...ht.textContent].map((ch, i) =>
+  `<span class="L" style="animation-delay:${i * 0.09}s">${ch}</span>`).join('');
+
+// прелоадер
+let prog = 0;
+const boot = setInterval(() => {
+  prog = Math.min(100, prog + Math.random() * 16);
+  if (prog >= 100) {
+    clearInterval(boot);
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('done');
+      ht.classList.add('typed');
+      document.querySelectorAll('#hero .reveal').forEach(el => el.classList.add('on'));
+    }, 400);
+  }
+}, 110);
+
+// руническая лента
+const runes = ['ᚱ ᛗ ᛟ ᚨ ᛞ ᚦ ᛖ ᚹ', 'BLISS · ПОРТАЛ СПОКОЙСТВИЯ', 'ᚱ ᛗ ᛟ ᚨ ᛞ ᚦ ᛖ ᚹ', 'THRONE AND LIBERTY · PVE'];
+const rseq = runes.map(s => `<span>${s}<i>✦</i></span>`).join('');
+document.getElementById('runes-inner').innerHTML = rseq + rseq;
+
+// reveal при скролле
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) e.target.classList.add('on');
+}), { threshold: 0.15 });
+document.querySelectorAll('.reveal:not(.on)').forEach(el => io.observe(el));
+
+// созвездие: звёзды загораются по очереди
+const cnodes = [...document.querySelectorAll('.cnode')];
+const cIo = new IntersectionObserver(es => {
+  if (es[0].isIntersecting) {
+    cIo.disconnect();
+    cnodes.forEach((n, i) => setTimeout(() => n.classList.add('on'), 300 + i * 340));
+  }
+}, { threshold: 0.25 });
+cIo.observe(document.getElementById('constellation'));
+
+// параллакс баннера и лёгкий сдвиг арки
+const bimg = document.getElementById('bannerImg');
+addEventListener('scroll', () => {
+  const sy = scrollY;
+  const br = bimg.getBoundingClientRect();
+  if (br.top < innerHeight && br.bottom > 0) {
+    const k = (br.top + br.height / 2 - innerHeight / 2) / innerHeight;
+    bimg.style.transform = 'scale(1.12) translateY(' + (k * -26) + 'px)';
+  }
+  stage.style.transform = 'translateY(' + (sy * 0.04) + 'px)';
+  stage.style.transform += ' rotate(' + (Math.sin(sy * 0.002) * 0.6) + 'deg)';
+}, { passive: true });
+
+/* видео: если файла ещё нет — показываем заглушку со ссылкой на YouTube */
+const bvideo = document.getElementById('buildVideo');
+if (bvideo) {
+  const showFall = () => document.getElementById('vfall').classList.add('show');
+  bvideo.addEventListener('error', showFall, true);
+  const bsrc = bvideo.querySelector('source');
+  if (bsrc) bsrc.addEventListener('error', showFall);
+}
+</script>
+</body>
+</html>

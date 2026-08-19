@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLISS — Орден Спокойствия · Throne and Liberty</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23060608'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='20' fill='%23d4b06a' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200;300;400;600;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --obsidian: #060608;
+    --gold: #d4b06a;
+    --gold-hi: #f0d9a8;
+    --silver: #c9c9cf;
+    --mist: #7ee8d8;
+    --line: rgba(212,176,106,.22);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background:var(--obsidian); color:var(--silver);
+    font-family:'Cormorant Garamond', serif;
+    overflow-x:hidden; cursor:none;
+  }
+  @media (pointer:coarse) { body { cursor:auto; } .cursor, .cursor-ring { display:none !important; } }
+  ::selection { background:var(--gold); color:var(--obsidian); }
+
+  /* ---------- cursor ---------- */
+  .cursor { position:fixed; width:8px; height:8px; background:var(--gold-hi); border-radius:50%;
+    z-index:1000; pointer-events:none; mix-blend-mode:difference; transform:translate(-50%,-50%); }
+  .cursor-ring { position:fixed; width:38px; height:38px; border:1px solid rgba(212,176,106,.55);
+    border-radius:50%; z-index:1000; pointer-events:none; transform:translate(-50%,-50%);
+    transition:width .25s, height .25s, border-color .25s, background .25s; }
+  .cursor-ring.grow { width:64px; height:64px; border-color:var(--gold); background:rgba(212,176,106,.08); }
+  a, button, .magnet, .card, .log-line { cursor:none; }
+
+  /* ---------- webgl ---------- */
+  #webgl { position:fixed; inset:0; z-index:0; }
+  .vignette { position:fixed; inset:0; z-index:2; pointer-events:none;
+    background:radial-gradient(ellipse 90% 70% at 50% 42%, transparent 50%, rgba(0,0,0,.72) 100%); }
+  .film { position:fixed; inset:-60%; z-index:3; pointer-events:none; opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:filmGrain 7s steps(10) infinite; }
+  @keyframes filmGrain { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-6%,4%)} 40%{transform:translate(4%,-7%)} 60%{transform:translate(-4%,-3%)} 80%{transform:translate(5%,6%)} }
+
+  main { position:relative; z-index:5; overflow:hidden; }
+
+  /* ---------- preloader ---------- */
+  #loader { position:fixed; inset:0; z-index:2000; background:var(--obsidian);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:26px;
+    transition:opacity .9s ease, visibility .9s; }
+  #loader.done { opacity:0; visibility:hidden; }
+  #loader .sigil { font-family:'Unbounded'; font-weight:200; font-size:64px; color:var(--gold);
+    animation:sigilPulse 2.2s ease-in-out infinite; }
+  @keyframes sigilPulse { 0%,100%{opacity:.4; letter-spacing:.1em} 50%{opacity:1; letter-spacing:.22em} }
+  #loader .bar { width:220px; height:1px; background:rgba(212,176,106,.18); overflow:hidden; }
+  #loader .bar i { display:block; height:100%; width:0%; background:linear-gradient(90deg, var(--gold), var(--gold-hi)); transition:width .2s; }
+  #loader .pct { font-family:'JetBrains Mono'; font-size:11px; letter-spacing:.4em; color:var(--gold); }
+
+  /* ---------- nav ---------- */
+  nav { position:fixed; top:0; left:0; right:0; z-index:100;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:26px 44px; mix-blend-mode:normal;
+    background:linear-gradient(rgba(6,6,8,.85), transparent); backdrop-filter:blur(2px); }
+  @media (max-width:900px){ nav .links { gap:20px; } nav .links a { font-size:9px; letter-spacing:.2em; } }
+  @media (max-width:560px){ nav .links { display:none; } }
+  nav .brand { font-family:'Unbounded'; font-weight:600; letter-spacing:.5em; font-size:15px; color:var(--gold-hi); }
+  nav .links { display:flex; gap:34px; }
+  nav .links a { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.3em; color:var(--silver);
+    text-decoration:none; text-transform:uppercase; opacity:.65; transition:opacity .3s, color .3s; position:relative; }
+  nav .links a::after { content:''; position:absolute; left:0; bottom:-6px; width:0; height:1px; background:var(--gold); transition:width .35s ease; }
+  nav .links a:hover { opacity:1; color:var(--gold-hi); } nav .links a:hover::after { width:100%; }
+
+  /* ---------- side rail ---------- */
+  .rail { position:fixed; right:38px; top:50%; transform:translateY(-50%); z-index:100;
+    display:flex; flex-direction:column; gap:16px; align-items:center; }
+  @media (max-width:1100px){ .rail { display:none; } }
+  .rail .rl { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.2em; color:rgba(201,201,207,.3);
+    writing-mode:vertical-rl; }
+  .rail .rline { width:1px; height:70px; background:linear-gradient(var(--line), transparent); }
+
+  /* ---------- shared type ---------- */
+  .mono { font-family:'JetBrains Mono', monospace; }
+  .eyebrow { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.55em; color:var(--gold);
+    text-transform:uppercase; display:flex; align-items:center; gap:16px; }
+  .eyebrow::before { content:''; width:44px; height:1px; background:var(--gold); opacity:.6; }
+  .ghost { font-family:'Unbounded'; font-weight:900; color:transparent;
+    -webkit-text-stroke:1px rgba(212,176,106,.13); user-select:none; pointer-events:none; }
+
+  .chapter { min-height:100vh; display:flex; align-items:center; padding:14vh 8vw; position:relative; scroll-margin-top:60px; }
+  @media (max-width:760px){ .chapter { padding:12vh 6vw; } }
+  .reveal { opacity:0; transform:translateY(46px); transition:opacity 1s cubic-bezier(.2,.7,.2,1), transform 1s cubic-bezier(.2,.7,.2,1); }
+  .reveal.on { opacity:1; transform:translateY(0); }
+  .d1 { transition-delay:.12s; } .d2 { transition-delay:.24s; } .d3 { transition-delay:.36s; }
+
+  /* ---------- hero ---------- */
+  #hero { flex-direction:column; justify-content:center; text-align:center; }
+  #hero .h-title { font-family:'Unbounded'; font-weight:900; font-size:clamp(70px, 16vw, 240px);
+    line-height:.9; letter-spacing:.02em;
+    background:linear-gradient(180deg, #f5f0e6 20%, var(--gold) 75%, #6b5a33 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 90px rgba(212,176,106,.25); }
+  #hero .h-sub { font-family:'Cormorant Garamond'; font-style:italic; font-size:clamp(20px,3vw,34px);
+    color:rgba(201,201,207,.85); margin-top:30px; font-weight:400; }
+  #hero .h-tag { margin-top:22px; font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.5em; color:rgba(212,176,106,.75); }
+  #hero .h-meta { position:absolute; bottom:44px; left:0; right:0; display:flex; justify-content:center; gap:56px; row-gap:14px; flex-wrap:wrap; padding:0 20px; }
+  #hero .h-meta div { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.25em; color:rgba(201,201,207,.4); }
+  #hero .h-meta b { color:var(--gold); font-weight:400; }
+
+  /* ---------- credo cards (3D tilt) ---------- */
+  .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:26px; margin-top:60px; perspective:1200px; }
+  @media (max-width:900px){ .cards { grid-template-columns:1fr; } }
+  .card { position:relative; padding:44px 34px 38px; border:1px solid var(--line);
+    background:linear-gradient(160deg, rgba(212,176,106,.05), rgba(6,6,8,.5) 60%);
+    backdrop-filter:blur(10px); transform-style:preserve-3d; transition:border-color .4s, box-shadow .4s; }
+  .card:hover { border-color:rgba(212,176,106,.6); box-shadow:0 30px 80px -30px rgba(212,176,106,.35); }
+  .card .num { font-family:'Unbounded'; font-weight:200; font-size:52px; color:transparent;
+    -webkit-text-stroke:1px rgba(212,176,106,.5); transform:translateZ(40px); }
+  .card h3 { font-family:'Unbounded'; font-weight:400; font-size:17px; color:#f0ead9; margin:26px 0 16px; transform:translateZ(30px); letter-spacing:.06em; }
+  .card p { font-size:17.5px; line-height:1.65; color:rgba(201,201,207,.72); transform:translateZ(20px); font-weight:400; }
+  .card .glyph { position:absolute; top:26px; right:28px; font-size:26px; color:var(--gold); opacity:.7; transform:translateZ(50px); }
+  .card::after { content:''; position:absolute; inset:0; opacity:0; transition:opacity .4s; pointer-events:none;
+    background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%), rgba(212,176,106,.14), transparent 45%); }
+  .card:hover::after { opacity:1; }
+
+  /* ---------- chronicle / terminal ---------- */
+  .split { display:grid; grid-template-columns:1.05fr .95fr; gap:70px; align-items:center; }
+  @media (max-width:980px){ .split { grid-template-columns:1fr; gap:44px; } }
+  h2.big { font-family:'Unbounded'; font-weight:600; font-size:clamp(30px,4.6vw,58px); line-height:1.12; color:#efe9da; letter-spacing:.01em; }
+  h2.big em { font-family:'Cormorant Garamond'; font-style:italic; font-weight:400; color:var(--gold); }
+  .lead { font-size:19px; line-height:1.75; color:rgba(201,201,207,.68); margin-top:26px; max-width:460px; }
+  .stats { display:flex; gap:44px; margin-top:44px; flex-wrap:wrap; }
+  .stat b { font-family:'Unbounded'; font-weight:300; font-size:40px; color:var(--gold-hi); display:block; }
+  .stat span { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:rgba(201,201,207,.45); text-transform:uppercase; }
+  .term { border:1px solid var(--line); background:rgba(3,3,5,.82); backdrop-filter:blur(14px);
+    font-family:'JetBrains Mono'; font-size:12px; line-height:1.9; padding:44px 28px 26px; position:relative; overflow:hidden; }
+  @media (max-width:980px){ .term { font-size:11px; padding:40px 18px 20px; } .term .tline .ts { margin-right:10px; } }
+  .term::before { content:'CHRONICLE.LOG — LIVE'; position:absolute; top:0; right:0; font-size:8px; letter-spacing:.3em;
+    color:var(--gold); border-left:1px solid var(--line); border-bottom:1px solid var(--line); padding:7px 14px; background:rgba(212,176,106,.07); }
+  .term .tline { color:rgba(201,201,207,.62); white-space:nowrap; overflow:hidden; display:flex; }
+  .term .tline .ts { color:var(--gold); margin-right:14px; }
+  .term .tline.ok .msg::after { content:' ✓'; color:var(--mist); }
+  .term .caret { display:inline-block; width:8px; height:15px; background:var(--gold); vertical-align:-2px;
+    animation:blink 1s steps(1) infinite; margin-top:10px; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* ---------- library / video ---------- */
+  .lib { display:grid; grid-template-columns:repeat(12,1fr); gap:22px; margin-top:60px; }
+  .vcard { position:relative; border:1px solid var(--line); overflow:hidden; background:#0a0a0d;
+    transition:transform .45s cubic-bezier(.2,.7,.2,1), border-color .45s; }
+  .vcard:hover { transform:translateY(-8px); border-color:rgba(212,176,106,.65); }
+  .vcard img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0;
+    filter:grayscale(.65) sepia(.25) contrast(1.05) brightness(.8); transition:filter .6s, transform .8s; opacity:.85; }
+  .vcard:hover img { filter:grayscale(0) sepia(0) contrast(1.05) brightness(.95); transform:scale(1.07); }
+  .vcard .cap { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end;
+    padding:26px; background:linear-gradient(transparent 40%, rgba(4,4,6,.92)); z-index:2; }
+  .vcard .cap .vt { font-family:'Unbounded'; font-weight:400; font-size:14px; color:#f0ead9; letter-spacing:.04em; }
+  .vcard .cap .vm { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.25em; color:var(--gold); margin-top:8px; opacity:0; transform:translateY(8px); transition:.4s; }
+  .vcard:hover .cap .vm { opacity:1; transform:translateY(0); }
+  .vcard .play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3;
+    width:64px; height:64px; border-radius:50%; border:1px solid rgba(240,217,168,.55);
+    display:flex; align-items:center; justify-content:center; opacity:0; scale:.7; transition:.45s;
+    background:rgba(6,6,8,.55); backdrop-filter:blur(6px); }
+  .vcard:hover .play { opacity:1; scale:1; }
+  .v-featured { grid-column:span 7; aspect-ratio:16/9.4; }
+  .v-a { grid-column:span 5; aspect-ratio:16/9.4; }
+  .v-b { grid-column:span 4; aspect-ratio:1/1.06; } .v-c { grid-column:span 4; aspect-ratio:1/1.06; } .v-d { grid-column:span 4; aspect-ratio:1/1.06; }
+  @media (max-width:900px){ .lib { grid-template-columns:1fr; } .lib > * { grid-column:span 1 !important; aspect-ratio:16/10; } }
+  .v-featured .play { width:88px; height:88px; }
+
+  /* ---------- видео-плеер и карточки-ссылки ---------- */
+  .vplayer { position:relative; background:#0a0a0d; }
+  .vplayer video { width:100%; height:100%; object-fit:cover; display:block; background:#040406; }
+  .vplayer .vlabel { position:absolute; top:0; left:0; right:0; z-index:3; pointer-events:none;
+    padding:20px 24px 30px; background:linear-gradient(rgba(4,4,6,.82), transparent); }
+  .vplayer .vlabel .vt { font-family:'Unbounded'; font-weight:400; font-size:14px; color:#f0ead9; letter-spacing:.05em; }
+  .vplayer .vlabel .vm { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.25em; color:var(--gold); margin-top:6px; }
+  .vplayer .vfall { position:absolute; inset:0; z-index:4; display:none; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px; text-align:center; padding:24px;
+    background:linear-gradient(165deg, #14120c, #0a0a0d); }
+  .vplayer .vfall.show { display:flex; }
+  .vplayer .vfall .fi { font-size:30px; color:var(--gold); text-shadow:0 0 18px rgba(212,176,106,.6); }
+  .vplayer .vfall .ft { font-family:'Cormorant Garamond'; font-style:italic; font-size:17.5px;
+    color:rgba(201,201,207,.78); max-width:360px; line-height:1.6; }
+  .vplayer .vfall a { font-family:'JetBrains Mono'; font-size:10px; letter-spacing:.3em; color:var(--gold-hi);
+    text-decoration:none; border:1px solid var(--line); padding:12px 24px; transition:.3s; }
+  .vplayer .vfall a:hover { background:rgba(212,176,106,.12); box-shadow:0 0 24px rgba(212,176,106,.2); }
+
+  .linkcard { display:flex; flex-direction:column; justify-content:center; align-items:center;
+    text-align:center; gap:12px; padding:30px 26px; text-decoration:none;
+    background:linear-gradient(160deg, rgba(212,176,106,.06), rgba(6,6,8,.55) 60%); }
+  .linkcard .lg { font-size:26px; color:var(--gold); line-height:1; }
+  .linkcard .lt { font-family:'Unbounded'; font-weight:400; font-size:15px; color:#f0ead9; letter-spacing:.06em; }
+  .linkcard .ls { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.22em; color:rgba(201,201,207,.5); }
+  .linkcard .la { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:var(--gold);
+    margin-top:6px; opacity:0; transform:translateY(6px); transition:.4s; }
+  .linkcard:hover .la { opacity:1; transform:translateY(0); }
+  @media (max-width:900px){ .linkcard { aspect-ratio:auto; padding:34px 22px; } }
+
+  /* ---------- marquee ---------- */
+  .marq { border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; padding:20px 0; position:relative; }
+  .marq .inner { display:flex; gap:64px; width:max-content; animation:marq 30s linear infinite; }
+  .marq span { font-family:'Unbounded'; font-weight:200; font-size:15px; letter-spacing:.35em;
+    color:rgba(212,176,106,.55); white-space:nowrap; }
+  .marq span i { font-style:normal; color:rgba(201,201,207,.3); margin:0 26px; }
+  @keyframes marq { to { transform:translateX(-50%); } }
+
+  /* ---------- perks ---------- */
+  .perks { margin-top:64px; }
+  .perk { display:grid; grid-template-columns:90px 1fr 1.1fr; gap:30px; align-items:baseline;
+    padding:34px 10px; border-bottom:1px solid rgba(212,176,106,.15); transition:.4s; position:relative; }
+  .perk:first-child { border-top:1px solid rgba(212,176,106,.15); }
+  .perk::before { content:''; position:absolute; left:0; bottom:-1px; height:1px; width:0; background:var(--gold); transition:width .6s cubic-bezier(.2,.7,.2,1); }
+  .perk:hover::before { width:100%; }
+  .perk:hover { padding-left:26px; }
+  .perk .pn { font-family:'JetBrains Mono'; font-size:11px; color:var(--gold); letter-spacing:.2em; }
+  .perk .pt { font-family:'Unbounded'; font-weight:400; font-size:clamp(16px,2vw,24px); color:#efe9da; letter-spacing:.03em; }
+  .perk .pd { font-size:17px; line-height:1.65; color:rgba(201,201,207,.62); }
+  @media (max-width:860px){ .perk { grid-template-columns:1fr; gap:10px; } }
+
+  /* ---------- CTA ---------- */
+  #join { text-align:center; flex-direction:column; justify-content:center; min-height:100vh; padding-bottom:16vh; }
+  #join .h-title2 { font-family:'Unbounded'; font-weight:800; font-size:clamp(44px,9vw,130px); line-height:1; color:#efe9da; }
+  #join .h-title2 em { font-family:'Cormorant Garamond'; font-weight:400; font-style:italic; color:var(--gold); }
+  .btn-magnet { display:inline-flex; align-items:center; gap:18px; margin-top:64px;
+    padding:26px 64px; border:1px solid var(--gold); color:var(--gold-hi); text-decoration:none;
+    font-family:'Unbounded'; font-weight:300; font-size:14px; letter-spacing:.35em;
+    position:relative; overflow:hidden; transition:color .45s; background:transparent; }
+  .btn-magnet::before { content:''; position:absolute; inset:0; background:var(--gold);
+    transform:scaleX(0); transform-origin:right; transition:transform .5s cubic-bezier(.76,0,.24,1); z-index:-1; }
+  .btn-magnet:hover { color:var(--obsidian); }
+  .btn-magnet:hover::before { transform:scaleX(1); transform-origin:left; }
+  footer { position:relative; z-index:5; padding:40px 44px 50px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:20px;
+    border-top:1px solid rgba(212,176,106,.14); background:rgba(4,4,6,.6); backdrop-filter:blur(6px); }
+  footer a, footer span { font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.3em; color:rgba(201,201,207,.4); text-decoration:none; text-transform:uppercase; }
+  footer a:hover { color:var(--gold-hi); }
+
+  .drag-hint { position:absolute; bottom:126px; left:50%; transform:translateX(-50%);
+    font-family:'JetBrains Mono'; font-size:9px; letter-spacing:.4em; color:rgba(201,201,207,.35); }
+  @media (max-height:700px){ .drag-hint { display:none; } }
+
+  @media (max-width:760px){
+    .card { padding:32px 24px 30px; }
+    .card .num { font-size:40px; }
+    .card .glyph { font-size:20px; top:20px; right:20px; }
+    h2.big { font-size:clamp(26px,7vw,36px); }
+    .lead { font-size:17px; }
+    .stat b { font-size:30px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .film { animation:none; }
+    .marq .inner { animation:none; }
+    .reveal { transition:none; opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="sigil">B</div>
+  <div class="bar"><i id="bar-fill"></i></div>
+  <div class="pct" id="pct">0%</div>
+</div>
+
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="curRing"></div>
+<canvas id="webgl"></canvas>
+<div class="vignette"></div>
+<div class="film"></div>
+
+<nav>
+  <a href="#hero" class="brand magnet" style="text-decoration:none">BLISS</a>
+  <div class="links">
+    <a href="#credo" class="magnet">Кредо</a>
+    <a href="#chronicle" class="magnet">Хроника</a>
+    <a href="#library" class="magnet">Библиотека</a>
+    <a href="#join" class="magnet">Вступить</a>
+  </div>
+</nav>
+
+<div class="rail">
+  <span class="rl">ORDO · QUIETIS</span>
+  <div class="rline"></div>
+  <span class="rl" style="color:var(--gold)">MMXXVI</span>
+</div>
+
+<main>
+
+  <!-- ================= HERO ================= -->
+  <section id="hero" class="chapter">
+    <div class="eyebrow reveal on" style="justify-content:center; margin-bottom:40px">
+      THRONE AND LIBERTY · PVE GUILD
+    </div>
+    <h1 class="h-title">BLISS</h1>
+    <p class="h-sub reveal on d1">Островок спокойствия посреди мира, охваченного гонкой.</p>
+    <p class="h-tag reveal on d2">ИССЛЕДУЙ · ФАРМИ · ИЗУЧАЙ</p>
+    <div class="drag-hint">⟲ ПОТЯНИ АРТЕФАКТ — ОН ЖИВОЙ</div>
+    <div class="h-meta">
+      <div>ИГРОКОВ — <b>50+</b></div>
+      <div>РЕЙДОВ / НЕДЕЛЮ — <b>7</b></div>
+      <div>ТОКСИЧНОСТИ — <b>0.00%</b></div>
+      <div>БАЗА БИЛДОВ — <b>https://tl-build.ru/profile/lympen</b></div>
+    </div>
+  </section>
+
+  <!-- ================= CREDO ================= -->
+  <section id="credo" class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="ghost" style="position:absolute; top:6%; right:-2%; font-size:clamp(90px,18vw,280px)">I</div>
+    <div class="reveal">
+      <div class="eyebrow">Глава I — Кредо</div>
+      <h2 class="big" style="margin-top:30px">Мы верим, что игра —<br>это <em>искусство неспешности.</em></h2>
+      <p class="lead">Bliss — PvE-гильдия для тех, кто устал от криков в войсе и дедлайнов в календаре. Мы закрываем контент уверенно, но без надрыва — и разбираем каждую механику до последней шестерёнки.</p>
+    </div>
+    <div class="cards">
+      <div class="card tilt reveal d1">
+        <span class="glyph">⌘</span>
+        <div class="num">01</div>
+        <h3>РЕЙДЫ БЕЗ ТОКСИЧНОСТИ</h3>
+        <p>Вайп — не повод для крика, а повод для разбора. Наши рейд-лидеры объясняют механики дважды, а бьют по столу — никогда. Атмосфера ближе к ужину с друзьями, чем к спортивной раздевалке.</p>
+      </div>
+      <div class="card tilt reveal d2">
+        <span class="glyph">✦</span>
+        <div class="num">02</div>
+        <h3>ГАЙДЫ И МЕХАНИКИ</h3>
+        <p>Каждую неделю — разборы билдов, боссов и экономики. Мы объясняем не только «что качать», но и «почему это работает», чтобы каждый понимал свою роль в группе на три хода вперёд.</p>
+      </div>
+      <div class="card tilt reveal d3">
+        <span class="glyph">☉</span>
+        <div class="num">03</div>
+        <h3>ЛЮДИ ПРЕЖДЕ ВСЕГО</h3>
+        <p>Лояльный онлайн: жизнь важнее игры. За каждым новичком закрепляется куратор. PvP — только по желанию. Мы строим гильдию, в которую хочется возвращаться, а не отчитываться.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CHRONICLE ================= -->
+  <section id="chronicle" class="chapter">
+    <div class="split">
+      <div class="reveal">
+        <div class="eyebrow">Глава II — Хроника</div>
+        <h2 class="big" style="margin-top:30px">Каждый рейд<br>вписан в <em>летопись.</em></h2>
+        <p class="lead">Мы ведём открытый журнал: киллы, вайпы, разборы ошибок и забавные моменты. Честная летопись вместо глянцевых скриншотов — потому что учатся на ошибках, а не на победных парадах.</p>
+        <div class="stats">
+          <div class="stat"><b>32</b><span>рейдов записано</span></div>
+          <div class="stat"><b>49</b><span>мировых боссов</span></div>
+          <div class="stat"><b>93%</b><span>возвращаются</span></div>
+        </div>
+      </div>
+      <div class="term reveal d2" id="term">
+        <div class="tline ok"><span class="ts">21:04</span><span class="msg">собран рейд-состав — 25/25</span></div>
+        <div class="tline ok"><span class="ts">21:07</span><span class="msg">вход: Дайгон · уровень сложности: 5</span></div>
+        <div class="tline"><span class="ts">21:12</span><span class="msg">фаза I пройдена · потерь: 4</span></div>
+        <div class="tline"><span class="ts">21:19</span><span class="msg">вайп на фазе II — разобраны позиции</span></div>
+        <div class="tline ok"><span class="ts">21:34</span><span class="msg">повторная попытка — босс повержен</span></div>
+        <div class="tline ok"><span class="ts">21:36</span><span class="msg">трофеи распределены по роллу</span></div>
+        <div class="tline"><span class="ts">21:41</span><span class="msg">запись летописи обновлена · скриншоты в архив</span></div>
+        <div class="tline"><span class="ts">21:45</span><span class="msg">голосовой канал: обсуждение билда танка</span></div>
+        <span class="caret"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LIBRARY ================= -->
+  <section id="library" class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="ghost" style="position:absolute; top:8%; left:-3%; font-size:clamp(90px,18vw,280px)">III</div>
+    <div class="reveal">
+      <div class="eyebrow">Глава III — Библиотека</div>
+      <h2 class="big" style="margin-top:30px">Знание — <em>общее достояние.</em></h2>
+      <p class="lead">Видео-разборы гильдии и единая база билдов. Всё проверено основными составами на практике и актуализируется после каждого патча.</p>
+    </div>
+    <div class="lib">
+      <!-- видео-плеер: локальный файл, работает без VPN -->
+      <div class="vcard v-featured vplayer reveal">
+        <video id="buildVideo" controls preload="metadata" playsinline>
+          <source src="assets/videos/kalgris-keys.mp4" type="video/mp4">
+        </video>
+        <div class="vlabel">
+          <div class="vt">ГАЙД · КАЛАГРИС · КЛЮЧИ</div>
+          <div class="vm">ФИНАЛЬНАЯ ЧАСТЬ · ВОСПРОИЗВОДИТСЯ ЗДЕСЬ</div>
+        </div>
+        <div class="vfall" id="vfall">
+          <div class="fi">✦</div>
+          <div class="ft">Видео появится здесь совсем скоро — а пока посмотри гайд на YouTube</div>
+          <a href="https://www.youtube.com/watch?v=w9vhFuMIy8s" target="_blank" rel="noopener">ОТКРЫТЬ НА YOUTUBE</a>
+        </div>
+      </div>
+
+      <!-- билд недели: ссылка на конкретный билд -->
+      <a class="vcard v-a linkcard reveal d1" href="https://tl-build.ru/build/2688" target="_blank" rel="noopener">
+        <span class="lg">⚔</span>
+        <span class="lt">БИЛД НЕДЕЛИ</span>
+        <span class="ls">SnS × GS · ПРОВЕРЕН В БОЮ</span>
+        <span class="la">ОТКРЫТЬ НА TL-BUILD.RU →</span>
+      </a>
+
+      <!-- сборник билдов -->
+      <a class="vcard v-b linkcard reveal d1" href="https://tl-build.ru/profile/lympen" target="_blank" rel="noopener">
+        <span class="lg">✦</span>
+        <span class="lt">СБОРНИК БИЛДОВ</span>
+        <span class="ls">ВСЕ СБОРКИ LYMPEN · ОБНОВЛЯЮТСЯ</span>
+        <span class="la">СМОТРЕТЬ ПРОФИЛЬ →</span>
+      </a>
+
+      <!-- полная версия на youtube -->
+      <a class="vcard v-c linkcard reveal d2" href="https://www.youtube.com/watch?v=w9vhFuMIy8s" target="_blank" rel="noopener">
+        <span class="lg">▷</span>
+        <span class="lt">ВИДЕО-ГАЙД</span>
+        <span class="ls">ПОЛНАЯ ВЕРСИЯ · YOUTUBE</span>
+        <span class="la">СМОТРЕТЬ НА YOUTUBE →</span>
+      </a>
+
+      <!-- база знаний -->
+      <a class="vcard v-d linkcard reveal d3" href="https://tl-build.ru" target="_blank" rel="noopener">
+        <span class="lg">⌘</span>
+        <span class="lt">БАЗА ЗНАНИЙ</span>
+        <span class="ls">ГАЙДЫ И БИЛДЫ · TL-BUILD.RU</span>
+        <span class="la">ПЕРЕЙТИ НА САЙТ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ================= MARQUEE ================= -->
+  <div class="marq">
+    <div class="inner" id="marq-inner"></div>
+  </div>
+
+  <!-- ================= PERKS ================= -->
+  <section class="chapter" style="flex-direction:column; align-items:flex-start">
+    <div class="reveal">
+      <div class="eyebrow">Глава IV — Привилегии</div>
+      <h2 class="big" style="margin-top:30px">Членство в гильдии —<br><em>это преимущества.</em></h2>
+    </div>
+    <div class="perks reveal d1">
+      <div class="perk"><span class="pn">/ 01</span><span class="pt">ПАРТНЁРКА T&L</span>
+        <span class="pd">Эксклюзивные плюшки партнёрской программы Throne and Liberty, розыгрыши призов и ранние разборы контент-апдейтов — ещё до их выхода.</span></div>
+      <div class="perk"><span class="pn">/ 02</span><span class="pt">БАЗА TL-BUILD.RU</span>
+        <span class="pd">Единая база билдов и гайдов гильдии — открытая, актуальная и проверенная в бою. Знание не прячется в закрытых табличках.</span></div>
+      <div class="perk"><span class="pn">/ 03</span><span class="pt">PvP ПО ЖЕЛАНИЮ</span>
+        <span class="pd">Никто не тащит на арену против твоей воли. PvP в Bliss — внутренние турниры и весёлые катки для тех, кому интересно.</span></div>
+      <div class="perk"><span class="pn">/ 04</span><span class="pt">КУРАТОРСТВО</span>
+        <span class="pd">За каждым новичком закреплён наставник: прокачка, билд, первые данжи и объяснение механик без снисходительности.</span></div>
+      <div class="perk"><span class="pn">/ 05</span><span class="pt">ГИЛЬДИЙНАЯ КАЗНА</span>
+        <span class="pd">Общий банк, крафт и расходники для рейдов — на благо всех. Вступительный взнос: адекватность и чувство юмора.</span></div>
+    </div>
+  </section>
+
+  <!-- ================= JOIN ================= -->
+  <section id="join" class="chapter">
+    <div class="eyebrow reveal on" style="justify-content:center">Финал — Твой ход</div>
+    <h2 class="h-title2 reveal on d1" style="margin-top:36px">Присоединяйся<br><em>к гильдии.</em></h2>
+    <p class="lead reveal on d2" style="margin:34px auto 0; text-align:center">
+      Анкета занимает три минуты. Мы отвечаем в течение дня — и встречаем новичков так, как хотели бы, чтобы встречали нас.
+    </p>
+    <a href="https://discord.gg/mBpv9NNh" class="btn-magnet magnet reveal on d3" id="ctaBtn">
+      ВСТУПИТЬ В DISCORD
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+    </a>
+  </section>
+
+  <footer>
+    <span>© MMXXVI · BLISS GUILD</span>
+    <div style="display:flex; gap:36px">
+      <a href="https://tl-build.ru" class="magnet">TL-BUILD.RU</a>
+      <a href="https://discord.gg/mBpv9NNh" class="magnet">DISCORD</a>
+      <span>THRONE AND LIBERTY</span>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+/* ============================================================
+   WEBGL — небула-шейдер + интерактивный артефакт
+============================================================ */
+const canvas = document.getElementById('webgl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 0, 26);
+
+// --- небула-фон (fullscreen quad за всем) ---
+const nebulaUniforms = { uTime: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) } };
+const nebula = new THREE.Mesh(
+  new THREE.PlaneGeometry(2, 2),
+  new THREE.ShaderMaterial({
+    uniforms: nebulaUniforms, depthWrite: false, depthTest: false,
+    vertexShader: `void main(){ gl_Position = vec4(position.xy, 1.0, 1.0); }`,
+    fragmentShader: `
+      precision highp float;
+      uniform float uTime; uniform vec2 uRes;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+      float noise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+      }
+      float fbm(vec2 p){
+        float v = 0.0, a = 0.5;
+        for(int i=0;i<5;i++){ v += a*noise(p); p = p*2.03 + vec2(17.0); a *= 0.5; }
+        return v;
+      }
+      void main(){
+        vec2 uv = gl_FragCoord.xy / uRes;
+        vec2 p = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+        float t = uTime * 0.02;
+        vec2 drift = vec2(t*0.6, -t*0.3);
+        float n1 = fbm(p*1.6 + drift);
+        float n2 = fbm(p*3.1 - drift*1.4 + n1*1.5);
+        vec3 deep  = vec3(0.016, 0.015, 0.026);
+        vec3 gold  = vec3(0.62, 0.47, 0.24);
+        vec3 teal  = vec3(0.10, 0.30, 0.28);
+        vec3 col = deep;
+        col += gold * pow(n1, 3.0) * 0.55 * smoothstep(0.9, 0.1, length(p*vec2(0.7,1.0)));
+        col += teal * pow(n2, 3.5) * 0.4 * smoothstep(1.1, 0.2, length(p - vec2(0.4, -0.2)));
+        vec2 starUv = gl_FragCoord.xy / 3.0;
+        float star = step(0.9985, hash(floor(starUv))) * (0.5 + 0.5*sin(uTime*2.0 + hash(floor(starUv))*40.0));
+        col += vec3(star) * 0.5;
+        col *= 0.75 + 0.25 * smoothstep(0.0, 0.4, uv.y);
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  })
+);
+nebula.frustumCulled = false; nebula.renderOrder = -1;
+scene.add(nebula);
+
+// --- артефакт: ядро + осколки + кольца + пыль ---
+const artifact = new THREE.Group();
+scene.add(artifact);
+
+const core = new THREE.Mesh(
+  new THREE.OctahedronGeometry(3.1, 0),
+  new THREE.MeshStandardMaterial({ color: 0x0c0c10, metalness: 0.95, roughness: 0.22, flatShading: true })
+);
+artifact.add(core);
+const coreWire = new THREE.LineSegments(
+  new THREE.EdgesGeometry(core.geometry),
+  new THREE.LineBasicMaterial({ color: 0xd4b06a, transparent: true, opacity: 0.85 })
+);
+artifact.add(coreWire);
+
+// осколки-спутники
+const shards = [];
+const shardMat = new THREE.MeshStandardMaterial({ color: 0x181410, metalness: 0.9, roughness: 0.3, flatShading: true });
+const shardWireMat = new THREE.LineBasicMaterial({ color: 0xd4b06a, transparent: true, opacity: 0.55 });
+for (let i = 0; i < 7; i++) {
+  const g = new THREE.Group();
+  const s = 0.22 + Math.random() * 0.5;
+  const geo = new THREE.TetrahedronGeometry(s, 0);
+  const m = new THREE.Mesh(geo, shardMat);
+  const w = new THREE.LineSegments(new THREE.EdgesGeometry(geo), shardWireMat);
+  g.add(m); g.add(w);
+  const orbitR = 5.4 + Math.random() * 3.4;
+  g.userData = {
+    orbitR, speed: 0.15 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2,
+    yAmp: 1.2 + Math.random() * 2.4, spin: (Math.random() - 0.5) * 2
+  };
+  artifact.add(g); shards.push(g);
+}
+
+// кольца
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xd4b06a, transparent: true, opacity: 0.38 });
+const ring1 = new THREE.Mesh(new THREE.TorusGeometry(6.4, 0.012, 8, 160), ringMat);
+const ring2 = new THREE.Mesh(new THREE.TorusGeometry(8.2, 0.008, 8, 160), ringMat.clone());
+ring2.material.opacity = 0.22;
+ring1.rotation.x = Math.PI / 2.15; ring2.rotation.x = Math.PI / 1.75; ring2.rotation.y = 0.5;
+artifact.add(ring1); artifact.add(ring2);
+
+// золотая пыль вокруг
+const dustGeo = new THREE.BufferGeometry();
+const dn = 900, dpos = new Float32Array(dn * 3);
+for (let i = 0; i < dn; i++) {
+  const r = 5 + Math.random() * 11, a = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI * 2;
+  dpos[i*3] = r * Math.sin(ph) * Math.cos(a); dpos[i*3+1] = r * Math.sin(ph) * Math.sin(a); dpos[i*3+2] = r * Math.cos(ph);
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dpos, 3));
+const dustPts = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  color: 0xd4b06a, size: 0.055, transparent: true, opacity: 0.65,
+  blending: THREE.AdditiveBlending, depthWrite: false
+}));
+artifact.add(dustPts);
+
+// свет
+scene.add(new THREE.AmbientLight(0x334, 0.5));
+const l1 = new THREE.PointLight(0xd4b06a, 1.6, 60); l1.position.set(10, 8, 14); scene.add(l1);
+const l2 = new THREE.PointLight(0x7ee8d8, 0.8, 50); l2.position.set(-12, -6, 8); scene.add(l2);
+const l3 = new THREE.DirectionalLight(0xffffff, 0.35); l3.position.set(-4, 10, -8); scene.add(l3);
+
+// --- взаимодействие: drag-вращение с инерцией + параллакс мыши ---
+let dragging = false, px = 0, py = 0, vx = 0, vy = 0, autoSpin = 0.0016;
+let mouseX = 0, mouseY = 0, scrollY = 0;
+addEventListener('mousedown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+addEventListener('mousemove', e => {
+  mouseX = (e.clientX / innerWidth - 0.5) * 2; mouseY = (e.clientY / innerHeight - 0.5) * 2;
+  if (dragging) { vy = (e.clientX - px) * 0.0045; vx = (e.clientY - py) * 0.0035; px = e.clientX; py = e.clientY; }
+});
+addEventListener('mouseup', () => dragging = false);
+addEventListener('scroll', () => scrollY = window.scrollY, { passive: true });
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  nebulaUniforms.uRes.value.set(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+function tick() {
+  requestAnimationFrame(tick);
+  const t = clock.getElapsedTime();
+
+  nebulaUniforms.uTime.value = t;
+
+  // инерция вращения артефакта
+  if (!dragging) { vx *= 0.94; vy *= 0.94; }
+  artifact.rotation.y += vy + (dragging ? 0 : autoSpin);
+  artifact.rotation.x += vx;
+  artifact.rotation.x = Math.max(-1.1, Math.min(1.1, artifact.rotation.x));
+
+  // дыхание ядра + свечение
+  const breathe = 1 + Math.sin(t * 0.9) * 0.02;
+  core.scale.setScalar(breathe);
+  coreWire.scale.setScalar(breathe * 1.001);
+  core.material.metalness = 0.75 + Math.sin(t * 1.4) * 0.2;
+  l1.intensity = 1.4 + Math.sin(t * 0.9) * 0.35;
+
+  // орбиты осколков
+  shards.forEach(sh => {
+    const a = t * sh.userData.speed + sh.userData.phase;
+    sh.position.set(Math.cos(a) * sh.userData.orbitR, Math.sin(a * 0.7) * sh.userData.yAmp, Math.sin(a) * sh.userData.orbitR);
+    sh.rotation.x += 0.01 * sh.userData.spin; sh.rotation.y += 0.013 * sh.userData.spin;
+  });
+  ring1.rotation.z = t * 0.12; ring2.rotation.z = -t * 0.08;
+  dustPts.rotation.y = t * 0.03; dustPts.rotation.x = Math.sin(t * 0.1) * 0.1;
+
+  // параллакс: артефакт уходит вверх и в сторону при скролле, камера мягко следует за мышью
+  const doc = document.body.scrollHeight - innerHeight;
+  const sp = doc > 0 ? scrollY / doc : 0;
+  artifact.position.y = sp * 26;
+  artifact.position.x = mouseX * 1.4;
+  camera.position.x += ((mouseX * 1.6) - camera.position.x) * 0.04;
+  camera.position.y += ((-mouseY * 1.2) - camera.position.y) * 0.04;
+  camera.lookAt(0, artifact.position.y * 0.35, 0);
+
+  renderer.render(scene, camera);
+}
+tick();
+</script>
+
+<script>
+/* ============ прелоадер ============ */
+let prog = 0;
+const fill = document.getElementById('bar-fill'), pct = document.getElementById('pct');
+const boot = setInterval(() => {
+  prog = Math.min(100, prog + Math.random() * 14);
+  fill.style.width = prog + '%'; pct.textContent = Math.floor(prog) + '%';
+  if (prog >= 100) {
+    clearInterval(boot);
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('done');
+      document.querySelectorAll('#hero .reveal').forEach(el => el.classList.add('on'));
+    }, 350);
+  }
+}, 120);
+
+/* ============ кастомный курсор ============ */
+const cur = document.getElementById('cur'), ring = document.getElementById('curRing');
+let cx = innerWidth/2, cy = innerHeight/2, rx = cx, ry = cy;
+addEventListener('mousemove', e => { cx = e.clientX; cy = e.clientY; });
+(function cursorLoop(){
+  requestAnimationFrame(cursorLoop);
+  cur.style.left = cx + 'px'; cur.style.top = cy + 'px';
+  rx += (cx - rx) * 0.14; ry += (cy - ry) * 0.14;
+  ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+})();
+document.querySelectorAll('a, .card, .vcard, .perk, .term').forEach(el => {
+  el.addEventListener('mouseenter', () => ring.classList.add('grow'));
+  el.addEventListener('mouseleave', () => ring.classList.remove('grow'));
+});
+
+/* ============ reveal при скролле ============ */
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) e.target.classList.add('on');
+}), { threshold: 0.15 });
+document.querySelectorAll('.reveal:not(.on)').forEach(el => io.observe(el));
+
+/* ============ 3D-tilt карточки + блик ============ */
+document.querySelectorAll('.tilt').forEach(card => {
+  card.addEventListener('mousemove', e => {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    card.style.transform = `rotateY(${(x - 0.5) * 14}deg) rotateX(${(0.5 - y) * 12}deg) translateZ(0)`;
+    card.style.setProperty('--mx', (x * 100) + '%');
+    card.style.setProperty('--my', (y * 100) + '%');
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transition = 'transform .7s cubic-bezier(.2,.7,.2,1)';
+    card.style.transform = 'rotateY(0) rotateX(0)';
+    setTimeout(() => card.style.transition = '', 700);
+  });
+});
+
+/* ============ терминал: строки появляются по очереди ============ */
+const lines = [...document.querySelectorAll('#term .tline')];
+lines.forEach(l => { const w = l.offsetWidth; l.style.maxWidth = w + 'px'; l.style.width = '0'; l.style.transition = 'width .7s steps(24)'; });
+let li = 0;
+const termIo = new IntersectionObserver(es => {
+  if (es[0].isIntersecting) {
+    termIo.disconnect();
+    const type = () => { if (li < lines.length) { lines[li].style.width = lines[li].style.maxWidth; li++; setTimeout(type, 420); } };
+    setTimeout(type, 500);
+  }
+}, { threshold: 0.3 });
+termIo.observe(document.getElementById('term'));
+
+/* ============ бегущая строка ============ */
+const marqItems = ['ИССЛЕДУЙ', 'ФАРМИ', 'РАЗБИРАЙ МЕХАНИКИ', 'БЕЗ ТОКСИЧНОСТИ', 'TL-BUILD.RU', 'PVE · THRONE AND LIBERTY', 'ОРДЕН СПОКОЙСТВИЯ'];
+const seq = marqItems.map(s => `<span>${s}<i>✦</i></span>`).join('');
+document.getElementById('marq-inner').innerHTML = seq + seq;
+
+/* ============ магнитная кнопка ============ */
+const btn = document.getElementById('ctaBtn');
+btn.addEventListener('mousemove', e => {
+  const r = btn.getBoundingClientRect();
+  const dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+  btn.style.transform = `translate(${dx * 0.18}px, ${dy * 0.28}px)`;
+});
+btn.addEventListener('mouseleave', () => {
+  btn.style.transition = 'transform .5s cubic-bezier(.2,.7,.2,1)';
+  btn.style.transform = 'translate(0,0)';
+  setTimeout(() => btn.style.transition = '', 500);
+});
+
+/* ============ видео: заглушка, если файла нет ============ */
+const bvideo = document.getElementById('buildVideo');
+if (bvideo) {
+  const showFall = () => document.getElementById('vfall').classList.add('show');
+  bvideo.addEventListener('error', showFall, true);
+  const bsrc = bvideo.querySelector('source');
+  if (bsrc) bsrc.addEventListener('error', showFall);
+}
+</script>
+</body>
+</html>
